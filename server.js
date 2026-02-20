@@ -3,39 +3,61 @@ const fs = require("fs");
 const path = require("path");
 
 const PORT = 3000;
-const logFile = path.join(__dirname, "requests.log");
+
+const visitsFile = path.join(__dirname, "visits.txt");
+const logsFile = path.join(__dirname, "logs.txt");
+
+// Function to log requests
+function logRequest(method, url) {
+  const timestamp = new Date().toISOString().replace("T", " ").split(".")[0];
+  const log = `[${timestamp}] ${method} ${url}\n`;
+  fs.appendFileSync(logsFile, log);
+}
 
 const server = http.createServer((req, res) => {
-  const route = req.url;
-  const method = req.method;
-  const dateTime = new Date().toLocaleString();
+  logRequest(req.method, req.url);
 
-  // Log format
-  const log = `${dateTime} | ${method} | ${route}\n`;
+  // ROUTE: /visit
+  if (req.method === "GET" && req.url === "/visit") {
+    let count = 0;
 
-  // Append log to file
-  fs.appendFile(logFile, log, (err) => {
-    if (err) console.error("Logging error:", err);
-  });
+    if (fs.existsSync(visitsFile)) {
+      count = parseInt(fs.readFileSync(visitsFile, "utf8")) || 0;
+    }
 
-  // Route handling
-  res.writeHead(200, { "Content-Type": "text/plain" });
+    count++;
+    fs.writeFileSync(visitsFile, count.toString());
 
-  if (route === "/") {
-    res.end("Home Page");
-  } 
-  else if (route === "/about") {
-    res.end("About Page");
-  } 
-  else if (route === "/contact") {
-    res.end("Contact Page");
-  } 
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    res.end(`Visit Count: ${count}`);
+  }
+
+  // ROUTE: /count
+  else if (req.method === "GET" && req.url === "/count") {
+    if (!fs.existsSync(visitsFile)) {
+      res.writeHead(200, { "Content-Type": "text/plain" });
+      res.end("No Visits Recorded");
+    } else {
+      const count = fs.readFileSync(visitsFile, "utf8");
+      res.writeHead(200, { "Content-Type": "text/plain" });
+      res.end(`Total Visits: ${count}`);
+    }
+  }
+
+  // ROUTE: /reset
+  else if (req.method === "GET" && req.url === "/reset") {
+    fs.writeFileSync(visitsFile, "0");
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    res.end("Visit Counter Reset Successfully");
+  }
+
+  // 404 HANDLER
   else {
-    res.writeHead(404);
-    res.end("404 - Page Not Found");
+    res.writeHead(404, { "Content-Type": "text/plain" });
+    res.end("404 Route Not Found");
   }
 });
 
 server.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
 });
