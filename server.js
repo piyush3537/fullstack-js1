@@ -1,38 +1,62 @@
 const http = require("http");
 const fs = require("fs");
-const path = require("path");
+const url = require("url");
 
 const PORT = 3000;
-const logFile = path.join(__dirname, "requests.log");
+const FILE_NAME = "notes.txt";
 
 const server = http.createServer((req, res) => {
-  const route = req.url;
-  const method = req.method;
-  const dateTime = new Date().toLocaleString();
+  const parsedUrl = url.parse(req.url, true);
+  const pathname = parsedUrl.pathname;
 
-  // Log format
-  const log = `${dateTime} | ${method} | ${route}\n`;
+  if (pathname === "/add" && req.method === "GET") {
+    const note = parsedUrl.query.note;
 
-  // Append log to file
-  fs.appendFile(logFile, log, (err) => {
-    if (err) console.error("Logging error:", err);
-  });
+    if (!note) {
+      res.writeHead(400, { "Content-Type": "text/plain" });
+      return res.end("400 Bad Request");
+    }
 
-  // Route handling
-  res.writeHead(200, { "Content-Type": "text/plain" });
+    fs.appendFile(FILE_NAME, note + "\n", (err) => {
+      if (err) {
+        res.writeHead(500, { "Content-Type": "text/plain" });
+        return res.end("Error Writing File");
+      }
 
-  if (route === "/") {
-    res.end("Home Page");
-  } 
-  else if (route === "/about") {
-    res.end("About Page");
-  } 
-  else if (route === "/contact") {
-    res.end("Contact Page");
-  } 
+      res.writeHead(200, { "Content-Type": "text/plain" });
+      res.end("Note Added Successfully");
+    });
+  }
+
+
+  else if (pathname === "/notes" && req.method === "GET") {
+    fs.readFile(FILE_NAME, "utf8", (err, data) => {
+      if (err || data.trim() === "") {
+        res.writeHead(200, { "Content-Type": "text/plain" });
+        return res.end("No Notes Found");
+      }
+
+      res.writeHead(200, { "Content-Type": "text/plain" });
+      res.end(data);
+    });
+  }
+
+  else if (pathname === "/clear" && req.method === "GET") {
+    fs.writeFile(FILE_NAME, "", (err) => {
+      if (err) {
+        res.writeHead(500, { "Content-Type": "text/plain" });
+        return res.end("Error Clearing Notes");
+      }
+
+      res.writeHead(200, { "Content-Type": "text/plain" });
+      res.end("All Notes Deleted");
+    });
+  }
+
+
   else {
-    res.writeHead(404);
-    res.end("404 - Page Not Found");
+    res.writeHead(404, { "Content-Type": "text/plain" });
+    res.end("404 Not Found");
   }
 });
 
